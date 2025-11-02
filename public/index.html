@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pitwall — Chat (Neobrutalism)</title>
+  <title>Pitwall</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <header class="nb-header">
-    <h1 class="nb-title">Pitwall — Cloudflare AI</h1>
+    <h1 class="nb-title">Pitwall AI</h1>
     <button id="theme" class="nb-btn nb-btn--ghost" title="Toggle theme">Theme</button>
   </header>
 
@@ -21,7 +21,7 @@
           <button id="new" class="nb-btn">New Session</button>
         </div>
       </div>
-      <p class="nb-note">Tip: session keeps short-term memory in a Durable Object. “New Session” starts fresh.</p>
+      <p class="nb-note">Chat memory is stored per Session ID in a Durable Object.</p>
     </section>
 
     <section class="nb-card nb-chat">
@@ -35,106 +35,43 @@
         <button id="send" class="nb-btn nb-btn--primary">Send →</button>
       </div>
     </section>
+
+    <section class="nb-card">
+      <h2>Telemetry Analysis</h2>
+      <p class="nb-note">Drop a CSV or choose a file. We'll compute stats and ask AI for anomalies and actions.</p>
+      <div class="nb-inline">
+        <input id="file" type="file" accept=".csv" class="nb-input" />
+        <button id="analyze" class="nb-btn nb-btn--primary">Analyze CSV</button>
+      </div>
+      <div id="telemetryOut" class="nb-telemetry"></div>
+    </section>
+
+    <section class="nb-card">
+      <h2>Strategy Simulation</h2>
+      <div class="nb-grid nb-grid-2">
+        <label>Laps <input id="laps" class="nb-input" type="number" value="20"></label>
+        <label>Base Lap (s) <input id="base" class="nb-input" type="number" value="90"></label>
+        <label>Fuel/Lap (L) <input id="fuel" class="nb-input" type="number" step="0.01" value="0.12"></label>
+        <label>Tank (L) <input id="tank" class="nb-input" type="number" value="8"></label>
+        <label>Pit Loss (s) <input id="pit" class="nb-input" type="number" value="22"></label>
+        <label>Tire Deg (s/lap) <input id="deg" class="nb-input" type="number" step="0.01" value="0.08"></label>
+        <label>Stint Plan (comma) <input id="stints" class="nb-input" value="10,10"></label>
+        <label>Safety Car Lap (opt) <input id="sc" class="nb-input" type="number" placeholder="e.g., 12"></label>
+      </div>
+      <div class="nb-actions">
+        <button id="simulate" class="nb-btn nb-btn--primary">Run Simulation</button>
+      </div>
+      <pre id="strategyOut" class="nb-pre"></pre>
+    </section>
   </main>
 
   <footer class="nb-footer">
-    <span>Built with Workers AI + Durable Objects</span>
+    <span>Workers AI + Durable Objects</span>
     <a class="nb-link" href="https://developers.cloudflare.com/workers-ai/" target="_blank" rel="noreferrer">Docs</a>
   </footer>
 
-  <script>
-    const session = document.getElementById('session');
-    const newBtn  = document.getElementById('new');
-    const chat    = document.getElementById('chat');
-    const msg     = document.getElementById('msg');
-    const send    = document.getElementById('send');
-    const mic     = document.getElementById('mic');
-    const theme   = document.getElementById('theme');
+  <script src="/scripts.js">
 
-    // theme toggle
-    theme.onclick = () => {
-      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem('nb-theme', next);
-    };
-    document.documentElement.dataset.theme = localStorage.getItem('nb-theme') || 'light';
-
-    // session
-    newBtn.onclick = () => {
-      session.value = crypto.randomUUID();
-      chat.innerHTML = "";
-      toast('New session created.');
-    };
-    if (!session.value) newBtn.click();
-
-    // bubbles
-    function addBubble(role, text) {
-      const wrap = document.createElement('div');
-      wrap.className = 'nb-bubble ' + (role === 'user' ? 'nb-bubble--user' : 'nb-bubble--ai');
-      wrap.innerText = text;
-      chat.appendChild(wrap);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    // tiny toast
-    function toast(t) {
-      const el = document.createElement('div');
-      el.className = 'nb-toast';
-      el.textContent = t;
-      document.body.appendChild(el);
-      setTimeout(() => el.classList.add('is-in'), 10);
-      setTimeout(() => el.classList.remove('is-in'), 2200);
-      setTimeout(() => el.remove(), 2600);
-    }
-
-    // send
-    send.onclick = async () => {
-      const s = session.value.trim();
-      const m = msg.value.trim();
-      if (!s || !m) return toast('Type a message first.');
-      addBubble('user', m);
-      msg.value = '';
-      send.disabled = true;
-
-      try {
-        const r = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId: s, message: m })
-        });
-        const data = await r.json();
-        addBubble('ai', data.reply ?? '[no reply]');
-      } catch (e) {
-        addBubble('ai', '⚠️ Error contacting server.');
-      } finally {
-        send.disabled = false;
-      }
-    };
-
-    // voice
-    let rec;
-    mic.onclick = () => {
-      if (!('webkitSpeechRecognition' in window)) {
-        return toast('SpeechRecognition not supported.');
-      }
-      if (!rec) {
-        const R = window.webkitSpeechRecognition;
-        rec = new R();
-        rec.lang = 'en-US';
-        rec.interimResults = false;
-        rec.onresult = e => {
-          const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-          msg.value = (msg.value ? (msg.value + ' ') : '') + text;
-        };
-      }
-      rec.start();
-      toast('Listening…');
-    };
-
-    // submit on Ctrl/⌘+Enter
-    msg.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') send.click();
-    });
   </script>
 </body>
 </html>
