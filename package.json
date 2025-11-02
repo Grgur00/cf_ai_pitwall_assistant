@@ -1,0 +1,16 @@
+{
+  "name": "cf_ai_pitwall_assistant",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251014.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.45.3"
+  }
+}
